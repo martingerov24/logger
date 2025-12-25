@@ -1,14 +1,17 @@
 #include <stdio.h>
 #include "common.hpp"
 #include "ring_buffer.hpp"
+#include "stdout_sink.h"
+#include "file_sink.h"
 #include "logger.hpp"
 #include <thread>
 #include <vector>
 
 scae::Buffer<2048> rb;
 scae::StdoutSink sink;
+scae::FileSink fileSink;
 
-scae::Logger<scae::LOGGING_LEVEL::INFO, scae::Buffer<2048>, scae::StdoutSink> logger(rb, sink);
+scae::Logger<scae::LOGGING_LEVEL::INFO, scae::Buffer<2048>, scae::FileSink> logger(rb, fileSink);
 
 // Testing function
 // ------------------------------
@@ -19,6 +22,8 @@ scae::Logger<scae::LOGGING_LEVEL::INFO, scae::Buffer<2048>, scae::StdoutSink> lo
 void testing();
 
 int main() {
+    fileSink.init("log.txt", 5);
+
     testing();
     return 0;
 }
