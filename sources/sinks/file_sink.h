@@ -20,7 +20,7 @@ namespace scae {
 
         ~FileSink();
     private:
-        const char* filename = nullptr;
+        char filename[256]{};
         int fd = -1;
         int maxMb = 50;
         int currentLog = 0;
