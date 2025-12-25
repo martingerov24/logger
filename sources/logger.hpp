@@ -1,7 +1,8 @@
 #pragma once
 #include <cinttypes>
-#include "stdout_sink.h"
 #include "common.hpp"
+#include <mutex>
+#include <atomic>
 
 namespace scae {
     enum class LOGGING_LEVEL : uint8_t {
@@ -27,13 +28,48 @@ namespace scae {
     template <
         LOGGING_LEVEL MaxLevel,
         BufferRefOk BufferT,
-        HasSinkWrite SinkT = StdoutSink
+        HasSinkWrite SinkT
     >
     class Logger {
     public:
         explicit constexpr Logger(BufferT& rb, SinkT& sink) noexcept
             : logBuffer(rb), sink(sink) {}
 
+        inline void debug(const char* message) noexcept {
+            log<LOGGING_LEVEL::DEBUG>(message);
+        }
+
+        inline void info(const char* message) noexcept {
+            log<LOGGING_LEVEL::INFO>(message);
+        }
+        inline void warn(const char* message) noexcept {
+            log<LOGGING_LEVEL::WARN>(message);
+        }
+
+        inline void error(const char* message) noexcept {
+            log<LOGGING_LEVEL::ERROR>(message);
+        }
+
+        void flush() noexcept {
+            if (writtenBytes.load() == 0) {
+                return;
+            }
+            std::lock_guard<std::mutex> flushLock(flushMtx);
+            uint8_t temp[256];
+            while (true) {
+                std::size_t n = 0;
+                { // Locking the buffer while reading
+                    std::lock_guard<std::mutex> lock(mtx);
+                    n = logBuffer.read(temp, sizeof(temp));
+                }
+                if (n == 0) {
+                    break;
+                }
+                (void)sink.write(temp, n);
+            }
+            writtenBytes.store(0);
+        }
+    private:
         template <LOGGING_LEVEL LevelToLog>
         void log(const char* message) noexcept {
             if constexpr (LevelToLog > MaxLevel) {
@@ -45,13 +81,13 @@ namespace scae {
 
             char line[256];
 
-            const uint64_t ts = scae::timestampMs();
+            const long long unsigned int ts = scae::timestampMs();
             const char* lvlStr = levelToString(LevelToLog);
 
             const int rc = std::snprintf(
                 line, sizeof(line),
                 "%llu [%s]: %s\n",
-                static_cast<unsigned long long>(ts),
+                ts,
                 lvlStr,
                 message
             );
@@ -64,22 +100,17 @@ namespace scae {
                     ? (sizeof(line) - 1)
                     : static_cast<std::size_t>(rc);
 
-            (void)logBuffer.write(reinterpret_cast<const uint8_t*>(line), toWrite);
+            { // Locking the buffer while writing
+                std::lock_guard<std::mutex> lock(mtx);
+                writtenBytes.fetch_add(static_cast<int>(toWrite), std::memory_order_relaxed);
+                (void)logBuffer.write(reinterpret_cast<const uint8_t*>(line), toWrite);
+            } // Unlocking the buffer
         }
-
-        void flush() noexcept {
-            uint8_t temp[256];
-            while (true) {
-                const std::size_t n = logBuffer.read(temp, sizeof(temp));
-                if (n == 0) {
-                    break;
-                }
-                (void)sink.write(temp, n);
-            }
-        }
-
     private:
         BufferT& logBuffer;
         SinkT& sink;
+        std::mutex mtx;
+        std::mutex flushMtx;
+        std::atomic<int> writtenBytes = 0;
     };
 } // namespace scae
