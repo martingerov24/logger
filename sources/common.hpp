@@ -13,7 +13,7 @@ namespace scae {
     }
     template <typename T>
     concept HasSinkWrite = requires(T& b, const uint8_t* p, std::size_t n) {
-        { b.write(p, n) } noexcept -> std::same_as<void>;
+        { b.write(p, n) } noexcept -> std::same_as<std::size_t>;
     };
 
     template <typename T>
