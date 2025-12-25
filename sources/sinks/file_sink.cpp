@@ -47,7 +47,7 @@ bool FileSink::init(
     const char* filename,
     const int maxMb
 ) noexcept {
-    this->filename = filename;
+    std::snprintf(this->filename, sizeof(filename), "%s", filename);
     this->maxMb = maxMb;
     return createRotatingFile();
 }

@@ -22,7 +22,8 @@ scae::Logger<scae::LOGGING_LEVEL::INFO, scae::Buffer<2048>, scae::FileSink> logg
 void testing();
 
 int main() {
-    fileSink.init("log.txt", 5);
+    std::string filename  = "log.txt";
+    fileSink.init(filename.c_str(), 5);
 
     testing();
     return 0;
