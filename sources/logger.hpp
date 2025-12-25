@@ -1,6 +1,6 @@
 #pragma once
 #include <cinttypes>
-#include "sink.h"
+#include "stdout_sink.h"
 #include "common.hpp"
 
 namespace scae {
