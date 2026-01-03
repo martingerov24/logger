@@ -35,18 +35,23 @@ namespace scae {
         explicit constexpr Logger(BufferT& rb, SinkT& sink) noexcept
             : logBuffer(rb), sink(sink) {}
 
-        inline void debug(const char* message) noexcept {
+        template <std::size_t N>
+        inline void debug(const char (&message)[N]) noexcept {
             log<LOGGING_LEVEL::DEBUG>(message);
         }
 
-        inline void info(const char* message) noexcept {
+        template <std::size_t N>
+        inline void info(const char (&message)[N]) noexcept {
             log<LOGGING_LEVEL::INFO>(message);
         }
-        inline void warn(const char* message) noexcept {
+
+        template <std::size_t N>
+        inline void warn(const char (&message)[N]) noexcept {
             log<LOGGING_LEVEL::WARN>(message);
         }
 
-        inline void error(const char* message) noexcept {
+        template <std::size_t N>
+        inline void error(const char (&message)[N]) noexcept {
             log<LOGGING_LEVEL::ERROR>(message);
         }
 
@@ -70,25 +75,27 @@ namespace scae {
             writtenBytes.store(0);
         }
     private:
-        template <LOGGING_LEVEL LevelToLog>
-        void log(const char* message) noexcept {
+        template <LOGGING_LEVEL LevelToLog, std::size_t N>
+        void log(const char (&message)[N]) noexcept {
             if constexpr (LevelToLog > MaxLevel) {
                 return;
             }
-            if (message == nullptr || message[0] == '\0') {
-                return;
-            }
+            static_assert(N < 256, "Log message too long (must be < 256 bytes)");
+            static_assert(N - 1 > 0, "Log message cannot be empty");
+            constexpr std::size_t len = N - 1;
 
-            char line[256];
+            std::array<char, 256> line{};
 
-            const long long unsigned int ts = scae::timestampMs();
+            const unsigned long long ts =
+                static_cast<unsigned long long>(scae::timestampMs());
             const char* lvlStr = levelToString(LevelToLog);
 
             const int rc = std::snprintf(
-                line, sizeof(line),
-                "%llu [%s]: %s\n",
+                line.data(), line.size(),
+                "%llu [%s]: %.*s\n",
                 ts,
                 lvlStr,
+                static_cast<int>(len),
                 message
             );
             if (rc <= 0) {
@@ -96,14 +103,24 @@ namespace scae {
             }
 
             const std::size_t toWrite =
-                (static_cast<std::size_t>(rc) >= sizeof(line))
-                    ? (sizeof(line) - 1)
+                (static_cast<std::size_t>(rc) >= line.size())
+                    ? (line.size() - 1)
                     : static_cast<std::size_t>(rc);
 
             { // Locking the buffer while writing
                 std::lock_guard<std::mutex> lock(mtx);
-                writtenBytes.fetch_add(static_cast<int>(toWrite), std::memory_order_relaxed);
-                (void)logBuffer.write(reinterpret_cast<const uint8_t*>(line), toWrite);
+                if (logBuffer.freeSpace() < toWrite) {
+                    droppedCount.fetch_add(1, std::memory_order_relaxed);
+                    return;
+                }
+
+                const std::size_t wrote = logBuffer.write(reinterpret_cast<const uint8_t*>(line.data()), toWrite);
+
+                if (wrote != toWrite) {
+                    droppedCount.fetch_add(1, std::memory_order_relaxed);
+                    return;
+                }
+                writtenBytes.fetch_add(wrote, std::memory_order_relaxed);
             } // Unlocking the buffer
         }
     private:
@@ -111,6 +128,7 @@ namespace scae {
         SinkT& sink;
         std::mutex mtx;
         std::mutex flushMtx;
+        std::atomic<int> droppedCount = 0;
         std::atomic<int> writtenBytes = 0;
     };
 } // namespace scae

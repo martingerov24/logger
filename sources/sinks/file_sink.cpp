@@ -36,8 +36,14 @@ bool FileSink::createRotatingFile() noexcept {
 
     fd = -1;
     currentLog++;
+    if (currentLog >= maxFiles && maxFiles > 0) {
+        currentLog = 0;
+    }
+
     const std::string rotatedFilename = std::string(filename) + std::to_string(currentLog) + ".old";
-    rename(filename, rotatedFilename.c_str());
+
+    (void)unlink(rotatedFilename.c_str());
+    (void)rename(filename, rotatedFilename.c_str());
 
     fd = open(filename, O_WRONLY | O_CREAT | O_APPEND, 0644);
     return fd != -1;
@@ -45,10 +51,12 @@ bool FileSink::createRotatingFile() noexcept {
 
 bool FileSink::init(
     const char* filename,
-    const int maxMb
+    const int maxMb,
+    const int maxFiles
 ) noexcept {
     std::snprintf(this->filename, sizeof(filename), "%s", filename);
     this->maxMb = maxMb;
+    this->maxFiles = maxFiles;
     return createRotatingFile();
 }
 

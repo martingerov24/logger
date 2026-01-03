@@ -10,7 +10,8 @@ namespace scae {
         FileSink() = default;
         bool init(
             const char* filename,
-            const int maxMb
+            const int maxMb,
+            const int maxFiles
         ) noexcept;
 
         std::size_t write(
@@ -23,6 +24,7 @@ namespace scae {
         char filename[256]{};
         int fd = -1;
         int maxMb = 50;
+        int maxFiles = 5;
         int currentLog = 0;
     };
 }

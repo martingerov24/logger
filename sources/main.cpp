@@ -7,11 +7,11 @@
 #include <thread>
 #include <vector>
 
-scae::Buffer<2048> rb;
+scae::Buffer<4096> rb;
 scae::StdoutSink sink;
 scae::FileSink fileSink;
 
-scae::Logger<scae::LOGGING_LEVEL::INFO, scae::Buffer<2048>, scae::FileSink> logger(rb, fileSink);
+scae::Logger<scae::LOGGING_LEVEL::INFO, scae::Buffer<4096>, scae::FileSink> logger(rb, fileSink);
 
 // Testing function
 // ------------------------------
@@ -23,7 +23,7 @@ void testing();
 
 int main() {
     std::string filename  = "log.txt";
-    fileSink.init(filename.c_str(), 5);
+    fileSink.init(filename.c_str(), 5, 3);
 
     testing();
     return 0;
@@ -48,6 +48,16 @@ void testing() {
 
         logger.flush();
     });
+
+
+    logger.debug("debug: should not be compiled for MaxLevel=INFO");
+    // logger.info("");
+    // const char longString [512] = "==========================================="
+    //     " =========================================="
+    //     " =========================================="
+    //     " =========================================="
+    //     " Very long strings should be compile time checked ";
+    // logger.error(longString);
 
     std::vector<std::thread> workers;
     workers.reserve(kNumWorkers);

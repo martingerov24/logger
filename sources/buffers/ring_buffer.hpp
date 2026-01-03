@@ -13,6 +13,7 @@ namespace scae {
         constexpr std::size_t capacity() const noexcept;
         constexpr bool isEmpty() const noexcept;
         constexpr bool isFull() const noexcept;
+        constexpr std::size_t freeSpace() const noexcept;
         constexpr Buffer();
         const std::size_t write(
             const uint8_t* src,
@@ -31,6 +32,11 @@ namespace scae {
     template<std::size_t N>
     constexpr std::size_t Buffer<N>::size() const noexcept {
         return (head - tail) & (N - 1);;
+    }
+
+    template<std::size_t N>
+    constexpr std::size_t Buffer<N>::freeSpace() const noexcept {
+        return capacity() - size();
     }
 
     template<std::size_t N>
